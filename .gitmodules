@@ -1,0 +1,3 @@
+[submodule "prisma_tools/PrismaSASECloudManaged_Python"]
+	path = prisma_tools/PrismaSASECloudManaged_Python
+	url = https://github.com/glspi/PrismaSASECloudManaged_Python.git

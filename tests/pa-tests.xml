@@ -1,0 +1,85 @@
+<?xml version="1.0"?>
+<config version="9.1.0" urldb="paloaltonetworks">
+  <devices>
+    <entry name="localhost.localdomain">
+      <vsys>
+        <entry name="vsys1">
+          <service>
+            <entry name="SMTP">
+              <protocol>
+                <tcp>
+                  <port>25</port>
+                </tcp>
+              </protocol>
+            </entry>
+            <entry name="svc ports 1">
+              <protocol>
+                <tcp>
+                  <port>111</port>
+                </tcp>
+              </protocol>
+            </entry>
+            <entry name="svc_2">
+              <protocol>
+                <tcp>
+                  <port>222</port>
+                </tcp>
+              </protocol>
+            </entry>
+          </service>
+          <service-group>
+            <entry name="svc_grp_1">
+              <members>
+                <member>svc ports 1</member>
+              </members>
+            </entry>
+            <entry name="svc_grp_2">
+              <members>
+                <member>svc_2</member>
+                <member>svc ports 1</member>
+              </members>
+            </entry>
+          </service-group>
+          <address>
+            <entry name="IPv4-Sinkhole">
+              <ip-netmask>72.5.65.111/32</ip-netmask>
+            </entry>
+            <entry name="addr-fqdn1">
+              <fqdn>test1.com</fqdn>
+              <tag>
+                <member>tag1</member>
+              </tag>
+            </entry>
+            <entry name="addr-ipnetmask1">
+              <ip-netmask>1.1.1.1/30</ip-netmask>
+              <tag>
+                <member>tag1</member>
+              </tag>
+            </entry>
+          </address>
+          <tag>
+            <entry name="tag1">
+              <color>color6</color>
+            </entry>
+            <entry name="tag-no-color"/>
+          </tag>
+          <address-group>
+            <entry name="addr_grp_1">
+              <static>
+                <member>test1.COM</member>
+                <member>addr 1</member>
+                <member>addr 2</member>
+                <member>addr 3</member>
+              </static>
+            </entry>
+            <entry name="addr_grp_2">
+              <static>
+                <member>addr-fqdn1</member>
+              </static>
+            </entry>
+          </address-group>
+        </entry>
+      </vsys>
+    </entry>
+  </devices>
+</config>
