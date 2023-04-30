@@ -1,8 +1,8 @@
-from prisma_migration import add_objects
+from prisma_tools import add_objects
 from rich.pretty import pprint
 
 
-filename = "../tests/pa-tests.xml"
+filename = "./tests/pa-tests.xml"
 xml_objs = add_objects.load_objects(filename)
 
 

@@ -1,7 +1,9 @@
 """prisma_tools.utils"""
 
-from prisma_tools.PrismaSASECloudManaged_Python.auth import saseAuthentication
+import sys
+
 from prisma_tools.PrismaSASECloudManaged_Python.access import prismaAccess
+from prisma_tools.PrismaSASECloudManaged_Python.auth import saseAuthentication
 
 
 def login(tsg_id: str, client_id: str, client_secret: str) -> prismaAccess:

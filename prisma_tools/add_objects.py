@@ -1,22 +1,24 @@
-from prisma_tools.PrismaSASECloudManaged_Python.auth import saseAuthentication
-from prisma_tools.PrismaSASECloudManaged_Python.access import prismaAccess
-from prisma_tools.PrismaSASECloudManaged_Python.access import policyObjects
-from prisma_tools.PrismaSASECloudManaged_Python.access import serviceSetup
-from lxml import etree
-import sys
-import typer
-from rich.pretty import pprint
-from typing import List, Dict
 import json
+import sys
 
+import typer
+from lxml import etree
+from rich.pretty import pprint
+
+from prisma_tools.PrismaSASECloudManaged_Python.access import (
+    policyObjects,
+    prismaAccess,
+    serviceSetup,
+)
+from prisma_tools.PrismaSASECloudManaged_Python.auth import saseAuthentication
 
 # Names of objects to be migrated
 COPY_OBJECTS = {
     "tags": [],
-    "addresses": ["CVV-A-DB.x.com", "cvision.x.com"],
-    "address_groups": ["Cell Extenders"],
-    "services": ["SMTP"],
-    "service_groups": ["GIS-Vendor-Service"],
+    "addresses": ["PCO-GIS-DS01"],
+    "address_groups": [],
+    "services": [],
+    "service_groups": [],
 }
 
 COLOR_MAP = {
@@ -162,14 +164,13 @@ def get_svc_groups_from_xml(service_groups):
             else:
                 my_svc_groups[name]["members"] = []
                 members = xmltag.getchildren()
-                # breakpoint()
                 for member in members:
                     my_svc_groups[name]["members"].append(member.text)
 
     return my_svc_groups
 
 
-def get_objs_from_xml(obj: str, config, existing_names: Dict):
+def get_objs_from_xml(obj: str, config, existing_names: dict):
     object_xpath = None
     if obj == "tags":
         object_xpath = "./devices/entry[@name='localhost.localdomain']/vsys/entry[@name='vsys1']/tag/entry"
@@ -202,8 +203,12 @@ def get_objs_from_xml(obj: str, config, existing_names: Dict):
 
 
 def load_objects(filename: str):
-    with open(filename) as fin:
-        configstr = fin.read()
+    try:
+        with open(filename) as fin:
+            configstr = fin.read()
+    except FileNotFoundError:
+        print(f"File: {filename} not found!")
+        sys.exit()
     try:
         config = etree.fromstring(configstr)
     except XMLSyntaxError as exc:
@@ -224,56 +229,61 @@ def load_objects(filename: str):
     return my_dict
 
 
-def create_tag(name, value, prisma_api):
+def create_tag(name, value, prisma_sdk):
     if value.get("color"):
         tag = {"name": name, "color": value["color"]}
     else:
         tag = {"name": name}
 
-    resp = prisma_api.paTagCreate(tag)
+    resp = prisma_sdk.paTagCreate(tag)
 
 
-def create_addresses(name, value, prisma_api):
+def create_addresses(name, value, prisma_sdk):
     address = {"name": name}
     address.update(value)
 
-    resp = prisma_api.paAddressesCreate(address)
+    resp = prisma_sdk.paAddressesCreate(address)
 
 
-def create_services(name, value, prisma_api):
+def create_services(name, value, prisma_sdk):
     service = {"name": name}
     service.update(value)
 
-    resp = prisma_api.paServicesCreateService(service)
+    resp = prisma_sdk.paServicesCreateService(service)
 
 
-def create_addr_groups(name, value, prisma_api):
+def create_addr_groups(name, value, prisma_sdk):
     group = {"name": name}
     group.update(value)
 
-    resp = prisma_api.paAddressGroupsCreate(group)
+    resp = prisma_sdk.paAddressGroupsCreate(group)
 
 
-def create_svc_groups(name, value, prisma_api):
+def create_svc_groups(name, value, prisma_sdk):
     group = {"name": name}
     group.update(value)
 
-    resp = prisma_api.paServiceGroupsCreate(group)
+    resp = prisma_sdk.paServiceGroupsCreate(group)
 
 
 def check_for_tags(xml_objs, existing_tag_names):
-    for _type, objects in COPY_OBJECTS.items():
+    for _type, objects in COPY_OBJECTS.copy().items():
         if _type == "tags":
             continue
-        for obj_name in objects:
-            if "tag" in xml_objs[_type][obj_name].keys():
-                tags = xml_objs[_type][obj_name]["tag"]
-                for tag in tags:
-                    if (
-                        tag not in existing_tag_names
-                        and tag not in COPY_OBJECTS["tags"]
-                    ):
-                        COPY_OBJECTS["tags"].append(tag)
+        for obj_name in objects.copy():
+            try:
+                if "tag" in xml_objs[_type][obj_name].keys():
+                    tags = xml_objs[_type][obj_name]["tag"]
+                    for tag in tags:
+                        if (
+                            tag not in existing_tag_names
+                            and tag not in COPY_OBJECTS["tags"]
+                        ):
+                            COPY_OBJECTS["tags"].append(tag)
+            except KeyError:
+                print(f"Warning: {obj_name} not found! Skipping..")
+                COPY_OBJECTS[_type].remove(obj_name)
+                continue
 
 
 def check_addr_groups(objects, xml_objs, existing_addr_group_names):
@@ -314,35 +324,39 @@ def check_svc_groups(objects, xml_objs, existing_svc_group_names):
 
 def check_groups(xml_objs, existing_addr_group_names, existing_svc_group_names):
 
-    for _type, objects in COPY_OBJECTS.items():
+    for _type, objects in COPY_OBJECTS.copy().items():
         if _type in ("tags", "addresses", "services"):
             continue
         if _type == "address_groups":
             repeat = True
             while repeat:
-                repeat = check_addr_groups(objects, xml_objs, existing_addr_group_names)
+                repeat = check_addr_groups(
+                    objects.copy(), xml_objs, existing_addr_group_names
+                )
         if _type == "service_groups":
             repeat = True
             while repeat:
-                repeat = check_svc_groups(objects, xml_objs, existing_svc_group_names)
+                repeat = check_svc_groups(
+                    objects.copy(), xml_objs, existing_svc_group_names
+                )
 
 
-def get_prisma_objects(prisma_api):
+def get_prisma_objects(prisma_sdk) -> dict:
     """
     Get objects from Prisma Access
     """
-    existing_tag_names = [tag["name"] for tag in prisma_api.paTagsListTags()]
+    existing_tag_names = [tag["name"] for tag in prisma_sdk.paTagsListTags()]
     existing_address_names = [
-        address["name"] for address in prisma_api.paAddressesListAddresses()
+        address["name"] for address in prisma_sdk.paAddressesListAddresses()
     ]
     existing_addr_group_names = [
-        group["name"] for group in prisma_api.paAddressGroupsListAddressGroups()
+        group["name"] for group in prisma_sdk.paAddressGroupsListAddressGroups()
     ]
     existing_service_names = [
-        service["name"] for service in prisma_api.paServicesListServices()
+        service["name"] for service in prisma_sdk.paServicesListServices()
     ]
     existing_svc_group_names = [
-        group["name"] for group in prisma_api.paServiceGroupsListServiceGroups()
+        group["name"] for group in prisma_sdk.paServiceGroupsListServiceGroups()
     ]
 
     obj_names = {
@@ -352,17 +366,11 @@ def get_prisma_objects(prisma_api):
         "services": existing_service_names,
         "service_groups": existing_svc_group_names,
     }
-    # objs = {
-    #     "tags": existing_tags,
-    #     "addresses": existing_addresses,
-    #     "address_groups": existing_addr_groups,
-    #     "services": existing_services,
-    #     "service_groups": existing_svc_groups,
-    # }
-    return obj_names, "N/A"
+
+    return obj_names
 
 
-def create_prisma_objects(xml_objs, existing_obj_names, prisma_api):
+def create_prisma_objects(xml_objs, existing_obj_names, prisma_sdk):
     """
     Create objects in Prisma Access
     """
@@ -382,22 +390,21 @@ def create_prisma_objects(xml_objs, existing_obj_names, prisma_api):
             if obj_name in xml_objs[_type].keys():
                 if obj_name not in existing_obj_names[_type]:
                     value = xml_objs[_type][obj_name]
-                    create(obj_name, value, prisma_api)
+                    create(obj_name, value, prisma_sdk)
                 else:
                     print(f"{_type} {obj_name} already exists, not creating!")
 
 
 def main(filename: str, prisma_api: prismaAccess):
+    prisma_sdk = policyObjects.policyObjects(prisma_api)
 
     # Get objects from XML, converted to dict
     xml_objs = load_objects(filename)
-    print("Retrieved XML objects")
+    print("Retrieved XML objects.")
 
-    api_objects = policyObjects.policyObjects(prisma_api)
-    print("Getting all objects")
-
-    existing_obj_names, _ = get_prisma_objects(api_objects)
-    print("Retrieved existing objects")
+    print("Getting all objects.")
+    existing_obj_names = get_prisma_objects(prisma_sdk)
+    print("Retrieved existing objects.\n")
 
     # Update COPY_OBJECTS groups to add members of the groups as well
     check_groups(
@@ -416,6 +423,6 @@ def main(filename: str, prisma_api: prismaAccess):
     while yesno.lower() not in ("y", "n", "yes", "no"):
         yesno = input("Continue? (yes/no): ")
     if yesno in ("yes", "y"):
-        create_prisma_objects(xml_objs, existing_obj_names, api_objects)
+        create_prisma_objects(xml_objs, existing_obj_names, prisma_sdk)
     else:
         print("Exiting..\n")
