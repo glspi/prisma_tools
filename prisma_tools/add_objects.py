@@ -1,4 +1,3 @@
-import json
 import sys
 
 import typer
@@ -10,7 +9,6 @@ from prisma_tools.PrismaSASECloudManaged_Python.access import (
     prismaAccess,
     serviceSetup,
 )
-from prisma_tools.PrismaSASECloudManaged_Python.auth import saseAuthentication
 
 # Names of objects to be migrated
 COPY_OBJECTS = {

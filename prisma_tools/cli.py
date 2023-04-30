@@ -2,8 +2,7 @@
 from __future__ import annotations
 import typer
 
-from prisma_tools import add_objects
-from prisma_tools import utils
+from prisma_tools import add_objects, clone, utils
 
 app = typer.Typer(
     name="ptools",
@@ -59,7 +58,7 @@ def migrate(
 
 
 @app.command("clone", help="Clone objects in Prisma Access. (GP App only currently)")
-def clone(
+def _clone(
     app_name: str = typer.Option(
         ...,
         "-a",
@@ -77,3 +76,4 @@ def clone(
         app_name: Name of existing Global Protect App Config
     """
     print("To be implemented soon.")
+    clone.gp_agent(name=app_name, prisma_api=state["prisma_api"])
