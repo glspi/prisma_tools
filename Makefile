@@ -3,8 +3,7 @@ lint:
 	python -m black .
 	python -m pylama .
 	python -m pydocstyle .
-	python -m mypy --strict --no-warn-return-any dcv/
+	python -m mypy --strict --no-warn-return-any prisma_tools/
 
-.PHONY: build
-build:
-	docker build -f Dockerfile -t dcv:latest .
+test:
+	python -m pytest tests/

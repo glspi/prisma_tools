@@ -1,0 +1,11 @@
+---
+# Sample template of which objects you would like to migrate
+address_groups:
+  - zoom-all
+addresses:
+  - PCO-GIS-DS01
+service_groups:
+services:
+  - tcp-8080
+  - udp-53
+tags:

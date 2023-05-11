@@ -1,23 +1,16 @@
+"""prisma_tools.migrate"""
 import sys
+from typing import Any
 
-import typer
 from lxml import etree
 from rich.pretty import pprint
 
 from prisma_tools.PrismaSASECloudManaged_Python.access import (
     policyObjects,
     prismaAccess,
-    serviceSetup,
 )
 
-# Names of objects to be migrated
-COPY_OBJECTS = {
-    "tags": [],
-    "addresses": ["PCO-GIS-DS01"],
-    "address_groups": [],
-    "services": [],
-    "service_groups": [],
-}
+COPY_OBJECTS: dict = {}
 
 COLOR_MAP = {
     "color1": "Red",
@@ -66,6 +59,7 @@ COLOR_MAP = {
 
 
 def get_tags_from_xml(tags):
+    """Pull tags from XML"""
     my_tags = {}
     for tag in tags:
         name = tag.attrib["name"]
@@ -79,6 +73,8 @@ def get_tags_from_xml(tags):
 
 
 def get_addresses_from_xml(addresses):
+    """Pull address from XML"""
+
     my_addresses = {}
     for address in addresses:
         name = address.attrib["name"]
@@ -95,6 +91,8 @@ def get_addresses_from_xml(addresses):
 
 
 def get_services_from_xml(services):
+    """Pull service from XML"""
+
     my_services = {}
     for service in services:
         name = service.attrib["name"]
@@ -124,6 +122,8 @@ def get_services_from_xml(services):
 
 
 def get_addr_groups_from_xml(address_groups):
+    """Pull address group from XML"""
+
     my_addr_groups = {}
     for group in address_groups:
         name = group.attrib["name"]
@@ -148,8 +148,12 @@ def get_addr_groups_from_xml(address_groups):
     return my_addr_groups
 
 
-def get_svc_groups_from_xml(service_groups):
-    my_svc_groups = {}
+def get_svc_groups_from_xml(
+    service_groups: list[etree.ElementTree],
+) -> dict[str, str | list[str]]:
+    """Pull service group from XML"""
+
+    my_svc_groups: dict = {}
 
     for group in service_groups:
         name = group.attrib["name"]
@@ -168,39 +172,74 @@ def get_svc_groups_from_xml(service_groups):
     return my_svc_groups
 
 
-def get_objs_from_xml(obj: str, config, existing_names: dict):
-    object_xpath = None
+def get_objs_from_xml(
+    obj: str, config: etree.ElementTree
+) -> dict[str, dict[str, str | list[str]]]:
+    """
+    Get objects from XML
+
+    Args:
+        obj: object type
+        config: XML config as etree
+
+    """
+    my_args = {}
+    my_func = None
     if obj == "tags":
-        object_xpath = "./devices/entry[@name='localhost.localdomain']/vsys/entry[@name='vsys1']/tag/entry"
+        object_xpath = (
+            "./devices/entry[@name='localhost.localdomain']"
+            "/vsys/entry[@name='vsys1']/tag/entry"
+        )
         objs = config.xpath(object_xpath)
         my_func = get_tags_from_xml
-        my_args = {"tags": objs}
+        my_args["tags"] = objs
     elif obj == "addresses":
-        object_xpath = "./devices/entry[@name='localhost.localdomain']/vsys/entry[@name='vsys1']/address/entry"
+        object_xpath = (
+            "./devices/entry[@name='localhost.localdomain']"
+            "/vsys/entry[@name='vsys1']/address/entry"
+        )
         objs = config.xpath(object_xpath)
         my_func = get_addresses_from_xml
-        my_args = {"addresses": objs}
+        my_args["addresses"] = objs
     elif obj == "services":
-        object_xpath = "./devices/entry[@name='localhost.localdomain']/vsys/entry[@name='vsys1']/service/entry"
+        object_xpath = (
+            "./devices/entry[@name='localhost.localdomain']"
+            "/vsys/entry[@name='vsys1']/service/entry"
+        )
         objs = config.xpath(object_xpath)
         my_func = get_services_from_xml
-        my_args = {"services": objs}
+        my_args["services"] = objs
     elif obj == "address_groups":
-        object_xpath = "./devices/entry[@name='localhost.localdomain']/vsys/entry[@name='vsys1']/address-group/entry"
+        object_xpath = (
+            "./devices/entry[@name='localhost.localdomain']"
+            "/vsys/entry[@name='vsys1']/address-group/entry"
+        )
         objs = config.xpath(object_xpath)
         my_func = get_addr_groups_from_xml
-        my_args = {"address_groups": objs}
+        my_args["address_groups"] = objs
     elif obj == "service_groups":
-        object_xpath = "./devices/entry[@name='localhost.localdomain']/vsys/entry[@name='vsys1']/service-group/entry"
+        object_xpath = (
+            "./devices/entry[@name='localhost.localdomain']"
+            "/vsys/entry[@name='vsys1']/service-group/entry"
+        )
         objs = config.xpath(object_xpath)
         my_func = get_svc_groups_from_xml
-        my_args = {"service_groups": objs}
-
+        my_args["service_groups"] = objs
+    if not my_func:
+        print(f"Unsupported object type '{obj}'.")
+        sys.exit()
     objs = my_func(**my_args)
     return objs
 
 
-def load_objects(filename: str):
+def load_objects(filename: str) -> dict[str, dict[str, str | list[str]]]:
+    """
+    Pull objects from Palo XML file
+
+    Args:
+        filename: Name of XML file
+
+    """
     try:
         with open(filename) as fin:
             configstr = fin.read()
@@ -209,12 +248,12 @@ def load_objects(filename: str):
         sys.exit()
     try:
         config = etree.fromstring(configstr)
-    except XMLSyntaxError as exc:
+    except etree.XMLSyntaxError as exc:
         print(exc)
         print("\nInvalid XML File...try again! Our best guess is up there ^^^\n")
-        sys.exit(1)
+        sys.exit()
 
-    my_dict = {
+    my_dict: dict = {
         "tags": {},
         "addresses": {},
         "services": {},
@@ -222,51 +261,73 @@ def load_objects(filename: str):
         "service_groups": {},
     }
     for obj in my_dict.keys():
-        my_dict[obj] = get_objs_from_xml(obj, config, {})
+        my_dict[obj] = get_objs_from_xml(obj, config)
 
     return my_dict
 
 
 def create_tag(name, value, prisma_sdk):
+    """Create Tag"""
+
     if value.get("color"):
         tag = {"name": name, "color": value["color"]}
     else:
         tag = {"name": name}
 
-    resp = prisma_sdk.paTagCreate(tag)
+    _ = prisma_sdk.paTagCreate(tag)
 
 
 def create_addresses(name, value, prisma_sdk):
+    """Create Address"""
+
     address = {"name": name}
     address.update(value)
 
-    resp = prisma_sdk.paAddressesCreate(address)
+    _ = prisma_sdk.paAddressesCreate(address)
 
 
 def create_services(name, value, prisma_sdk):
+    """Create Service"""
+
     service = {"name": name}
     service.update(value)
 
-    resp = prisma_sdk.paServicesCreateService(service)
+    _ = prisma_sdk.paServicesCreateService(service)
 
 
 def create_addr_groups(name, value, prisma_sdk):
+    """Create Address Group"""
+
     group = {"name": name}
     group.update(value)
 
-    resp = prisma_sdk.paAddressGroupsCreate(group)
+    _ = prisma_sdk.paAddressGroupsCreate(group)
 
 
 def create_svc_groups(name, value, prisma_sdk):
+    """Create Service Croup"""
+
     group = {"name": name}
     group.update(value)
 
-    resp = prisma_sdk.paServiceGroupsCreate(group)
+    _ = prisma_sdk.paServiceGroupsCreate(group)
 
 
-def check_for_tags(xml_objs, existing_tag_names):
+def check_for_tags(
+    xml_objs: dict[str, dict[str, Any]], existing_tag_names: list[str]
+) -> None:
+    """
+    Check the objects for other tags, which will need to be migrated
+
+    Args:
+        xml_objs: object data obtained from XML
+        existing_tag_names: list of existing tags
+
+    """
     for _type, objects in COPY_OBJECTS.copy().items():
         if _type == "tags":
+            continue
+        if not objects:
             continue
         for obj_name in objects.copy():
             try:
@@ -284,7 +345,13 @@ def check_for_tags(xml_objs, existing_tag_names):
                 continue
 
 
-def check_addr_groups(objects, xml_objs, existing_addr_group_names):
+def check_addr_groups(
+    objects: list[str],
+    xml_objs: dict[str, dict[str, Any]],
+    existing_addr_group_names: list[str],
+) -> bool:
+    """Check Address Groups"""
+
     repeat = False
     for obj_name in objects:
         for member in xml_objs["address_groups"][obj_name]["static"]:
@@ -302,7 +369,13 @@ def check_addr_groups(objects, xml_objs, existing_addr_group_names):
     return repeat
 
 
-def check_svc_groups(objects, xml_objs, existing_svc_group_names):
+def check_svc_groups(
+    objects: list[str],
+    xml_objs: dict[str, dict[str, Any]],
+    existing_svc_group_names: list[str],
+) -> bool:
+    """Check Service Groups"""
+
     repeat = False
     for obj_name in objects:
         for member in xml_objs["service_groups"][obj_name]["members"]:
@@ -320,10 +393,26 @@ def check_svc_groups(objects, xml_objs, existing_svc_group_names):
     return repeat
 
 
-def check_groups(xml_objs, existing_addr_group_names, existing_svc_group_names):
+def check_groups(
+    xml_objs: dict[str, dict[str, Any]],
+    existing_addr_group_names: list[str],
+    existing_svc_group_names: list[str],
+) -> None:
+    """
+    Check the groups for other members/groups that indirectly also need to be migrated
 
+    Calls specific addr group/svc group function as needed
+
+    Args:
+        xml_objs: object data obtained from XML
+        existing_addr_group_names: Address groups already in Prisma Access
+        existing_svc_group_names: Service groups already in Prisma Access
+
+    """
     for _type, objects in COPY_OBJECTS.copy().items():
         if _type in ("tags", "addresses", "services"):
+            continue
+        if not objects:
             continue
         if _type == "address_groups":
             repeat = True
@@ -339,9 +428,13 @@ def check_groups(xml_objs, existing_addr_group_names, existing_svc_group_names):
                 )
 
 
-def get_prisma_objects(prisma_sdk) -> dict:
+def get_prisma_objects(prisma_sdk: policyObjects.policyObjects) -> dict:
     """
     Get objects from Prisma Access
+
+    Args:
+        prisma_sdk: prismaAccess API policyObjects (containing actual api calls)
+
     """
     existing_tag_names = [tag["name"] for tag in prisma_sdk.paTagsListTags()]
     existing_address_names = [
@@ -368,9 +461,19 @@ def get_prisma_objects(prisma_sdk) -> dict:
     return obj_names
 
 
-def create_prisma_objects(xml_objs, existing_obj_names, prisma_sdk):
+def create_prisma_objects(
+    xml_objs: dict[str, dict[str, Any]],
+    existing_obj_names: dict[str, list[str]],
+    prisma_sdk: policyObjects.policyObjects,
+) -> None:
     """
     Create objects in Prisma Access
+
+    Args:
+        xml_objs: object data obtained from XML
+        existing_obj_names: object names already in Prisma Access
+        prisma_sdk: prismaAccess API policyObjects (containing actual api calls)
+
     """
     for _type, obj_names in COPY_OBJECTS.items():
         if _type == "tags":
@@ -383,6 +486,9 @@ def create_prisma_objects(xml_objs, existing_obj_names, prisma_sdk):
             create = create_services
         elif _type == "service_groups":
             create = create_svc_groups
+        else:
+            print(f"Unsupported object type '{_type}'.")
+            sys.exit()
 
         for obj_name in obj_names:
             if obj_name in xml_objs[_type].keys():
@@ -393,8 +499,21 @@ def create_prisma_objects(xml_objs, existing_obj_names, prisma_sdk):
                     print(f"{_type} {obj_name} already exists, not creating!")
 
 
-def main(filename: str, prisma_api: prismaAccess):
+def run(filename: str, prisma_api: prismaAccess.prismaAccess, copy_objects: dict):
+    """
+    Migration Entry Point
+
+    Args:
+        filename: XML Filename containing Palo configuration
+        prisma_api: prismaAccess API Object
+        copy_objects: dictionary of all objects to be migrated
+
+    """
     prisma_sdk = policyObjects.policyObjects(prisma_api)
+    global COPY_OBJECTS
+    COPY_OBJECTS = copy_objects
+    if not COPY_OBJECTS["tags"]:
+        COPY_OBJECTS["tags"] = []
 
     # Get objects from XML, converted to dict
     xml_objs = load_objects(filename)

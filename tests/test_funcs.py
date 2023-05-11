@@ -1,9 +1,9 @@
-from prisma_tools import add_objects
 from rich.pretty import pprint
 
+from prisma_tools import migrate
 
 filename = "./tests/pa-tests.xml"
-xml_objs = add_objects.load_objects(filename)
+xml_objs = migrate.load_objects(filename)
 
 
 def test_mvp_objs():
@@ -33,7 +33,7 @@ def test_mvp_objs():
     assert mvp_objs == xml_objs
 
 
-def test_copy_objs1():
+def test_copy_objs():
     TEST_COPY_OBJECTS = {
         "tags": [],
         "addresses": ["addr-ipnetmask1"],
@@ -49,12 +49,12 @@ def test_copy_objs1():
         "service_groups": [],
     }
 
-    add_objects.COPY_OBJECTS = TEST_COPY_OBJECTS
-    add_objects.check_groups(xml_objs, [], [])
-    add_objects.check_for_tags(xml_objs, [])
+    migrate.COPY_OBJECTS = TEST_COPY_OBJECTS
+    migrate.check_groups(xml_objs, [], [])
+    migrate.check_for_tags(xml_objs, [])
     # pprint(add_objects.COPY_OBJECTS)
 
-    assert maybe_correct == add_objects.COPY_OBJECTS
+    assert maybe_correct == migrate.COPY_OBJECTS
 
 
 if __name__ == "__main__":
