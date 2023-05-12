@@ -9,7 +9,7 @@ Command line tool(s) to assist with Prisma Access. Currently there are 2 tools:
 - Python 3.10+
 
 For authentication into Prisma Access, you'll need your API credentials:
-- Tenant Service Group ID (tsg_id)
+- Tenant Service Group ID (TSG ID)
 - Client ID
 - Client Secret
 
@@ -23,7 +23,7 @@ Optional but recommended:
 Install:
 - `pip install git+https://github.com/glspi/prisma_tools.git`
 
-### Usage
+## Usage
 The installation process will install an executable `ptools` on your path. Run `ptools --help` for help.
 You can also get help for each individual command (migrate, diff) via `ptools COMMAND --help`
 
@@ -32,7 +32,7 @@ be entered via prompts if not provided within the command itself.
 
 If any option required by a command is not input via a cli flag, you will be prompted to provide it at runtime.
 
-#### Migrating objects to Prisma:
+### Migrating objects to Prisma: (ptools migrate)
 This will copy objects from a Palo XML config into Prisma Access. Use the sample file found [here](sample-copy-objects.yml) to choose
 which objects you want to migrate from XML to Prisma.
 
@@ -51,13 +51,14 @@ and prompted to continue when ready.
 
 `ptools migrate -o myobjects.yml -f palo-config.xml`
 
-#### Compare two objects within Prisma:
+### Compare two objects within Prisma: (ptools diff)
 Choose the object type you would like to compare, and then enter the names of the objects via prompts.
 
 Supported Object Types:
 - Global Protect App/config
 - Security Rules
 - URL Profiles
+- *more can be added easily, just ask!*
 
 `ptools diff -o <object_type>`
 (see --help for exact object type names)
